@@ -1,0 +1,61 @@
+"""
+Python Extract Transform Load Example
+"""
+
+# %%
+import mysql.connector
+import pandas as pd
+import datetime as dt
+from sqlalchemy import create_engine
+
+def extract()-> dict:
+    mydb = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="1234",
+    database="austin"
+    )
+
+    mycursor = mydb.cursor(dictionary = True)
+
+    mycursor.execute("SELECT * FROM austin.austin_animal_center_outcomes;")
+
+    myresult = mycursor.fetchall()
+
+    data = pd.DataFrame(myresult)
+
+    mycursor.close()
+    mydb.close()
+
+    return data
+
+def transform(data:dict) -> pd.DataFrame:
+    """ Transforms the dataset into desired structure and filters"""
+    df = data
+    print(f"Total Number of animals in the austin animal centers {len(df)}")
+    df = df[df["Animal Type"].str.contains("Dog")]
+    print(f"Number of dogs with austin animal centers outcome {len(df)}")
+    df = df[df['Outcome Type'].str.contains('Adoption') == True]
+    df["Age"] = (dt.datetime.today()-pd.to_datetime(df['Date of Birth'])).astype('timedelta64[Y]')
+    print(f"Number of dogs available in austin animal centers {len(df)}")
+    df["Age"] = df["Age"].astype('Int64')
+    return df[["Name","Date of Birth","Breed","Color","Age"]]
+
+def load(df:pd.DataFrame)-> None:
+    """ Loads data into a sqllite database"""
+    """mydb = pymysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="1234",
+    database="austin"
+    )"""
+    engine = create_engine('mysql+pymysql://root:1234@localhost/austin')
+    df.to_sql(con=engine, name='austin_adoptable_dogs', if_exists='replace', index = False)
+
+
+# %%
+data = extract()
+df = transform(data)
+load(df)
+
+# %%
